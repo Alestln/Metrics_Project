@@ -1,8 +1,19 @@
 ﻿services:
   metrics_project:
-    image: metrics_project
+    image: metrics_api
+    container_name: api
     build:
       context: .
       dockerfile: Metrics_Project/Dockerfile
     ports:
       - "8080:8080"
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
