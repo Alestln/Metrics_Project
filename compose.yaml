@@ -1,0 +1,8 @@
+﻿services:
+  metrics_project:
+    image: metrics_project
+    build:
+      context: .
+      dockerfile: Metrics_Project/Dockerfile
+    ports:
+      - "8080:8080"
