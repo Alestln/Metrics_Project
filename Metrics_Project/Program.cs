@@ -1,3 +1,6 @@
+using Metrics_Project.Contexts;
+using Microsoft.EntityFrameworkCore;
+
 namespace Metrics_Project;
 
 public class Program
@@ -14,6 +17,9 @@ public class Program
         builder.Services.AddSwaggerGen();
         
         builder.Services.AddControllers();
+
+        builder.Services.AddDbContext<DataDbContext>(opt =>
+            opt.UseNpgsql(builder.Configuration.GetConnectionString("Data")));
 
         var app = builder.Build();
 
