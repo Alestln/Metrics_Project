@@ -1,50 +1,92 @@
 ﻿services:
   metrics_project:
     image: metrics_api
-    container_name: api
+    container_name: metrics_api
     build:
       context: .
       dockerfile: Metrics_Project/Dockerfile
     ports:
       - "8080:8080"
-    #depends_on:
-    #  - postgres
+    environment:
+      ConnectionStrings__Data: "Server=postgres;Port=5432;Database=data;Username=postgres;Password=123456"
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     networks:
       - my-network
   
-  #postgres:
-  #  image: postgres:17.4-alpine
-  #  container_name: postgres
-  #  environment:
-  #    POSTGRES_USER: postgres
-  #    POSTGRES_PASSWORD: 123456
-  #  ports:
-  #    - "5432:5432"
-  #  volumes:
-  #    - postgres_data:/var/lib/postgresql/data
-  #  networks:
-  #    - my-network
+  migrations:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: migrations
+    working_dir: /app
+    volumes:
+      - ./.:/app
+    environment:
+      ConnectionStrings__Data: "Server=postgres;Port=5432;Database=data;Username=postgres;Password=123456"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c "echo 'Waiting a bit for network...' && sleep 3 && 
+                     echo 'Changing to project directory...' && cd Metrics_Project && 
+                     echo 'Installing dotnet-ef tool...' && dotnet tool install --global dotnet-ef --version 8.0.8 && 
+                     export PATH=\"$$PATH:/root/.dotnet/tools\" && 
+                     echo 'Applying migrations...' && dotnet ef database update"
+    networks:
+      - my-network
   
-  #postgres_exporter:
-   # image: prometheuscommunity/postgres-exporter
-    #container_name: postgres-exporter
-    #environment:
-     # DATA_SOURCE_NAME: "postgresql://postgres:123456@postgres:5432/forum?sslmode=disable"
+  postgres:
+    image: postgres:17.4-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: data
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - my-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d data" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:123456@postgres:5432/data?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - my-network
   
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:latest
     container_name: prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - postgres_exporter
     networks:
       - my-network
   
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:latest
     container_name: grafana
     ports:
       - "3000:3000"
@@ -55,6 +97,8 @@
       - prometheus
     networks:
       - my-network
+    volumes:
+      - grafana_data:/var/lib/grafana
 
 networks:
   my-network:
@@ -62,4 +106,5 @@ networks:
 
 volumes:
   postgres_data:
-    driver: local
+  prometheus_data:
+  grafana_data:

@@ -1,4 +1,7 @@
+using Metrics_Project.Contexts;
+using Metrics_Project.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Metrics_Project.Controllers;
 
@@ -6,9 +9,36 @@ namespace Metrics_Project.Controllers;
 [Route("[controller]/[action]")]
 public class TestController : ControllerBase
 {
-    [HttpGet]
-    public async Task<ActionResult> Get()
+    private readonly DataDbContext _context;
+
+    public TestController(DataDbContext context)
     {
-        return Ok("Hello World!");
+        _context = context;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult> Get(CancellationToken cancellationToken)
+    {
+        var data = await _context.Persons
+            .ToListAsync(cancellationToken);
+        
+        return Ok(data);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Create(CancellationToken cancellationToken)
+    {
+        var person = new Person()
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            MiddleName = "John",
+            BirthdayDate = DateTime.Now,
+        };
+        
+        _context.Persons.Add(person);
+        await _context.SaveChangesAsync(cancellationToken);
+        
+        return Ok();
     }
 }
