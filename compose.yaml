@@ -55,6 +55,12 @@
       interval: 5s
       timeout: 5s
       retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
   
   postgres_exporter:
     image: prometheuscommunity/postgres-exporter:latest
@@ -63,6 +69,10 @@
       DATA_SOURCE_NAME: "postgresql://postgres:123456@postgres:5432/data?sslmode=disable"
     ports:
       - "9187:9187"
+    volumes:
+      - ./queries.yml:/etc/postgres_exporter/queries.yml
+    command:
+      - '--extend.query-path=/etc/postgres_exporter/queries.yml'
     depends_on:
       postgres:
         condition: service_healthy
